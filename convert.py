@@ -1,7 +1,13 @@
 import xml.etree.ElementTree as ET
-import p5
+import numpy as np
 import math
 import sys
+
+def limit(vetor, limite):
+    magnitude = np.linalg.norm(vetor)
+    if magnitude > limite:
+        return vetor * (limite / magnitude)
+    return vetor
 
 tree = ET.parse(sys.argv[1])
 root = tree.getroot()
@@ -21,9 +27,10 @@ lateral70 = math.floor(3696 * GSD / 100)
 vs = []
 for i in range(4):
     xyz = [float(n) for n in coordinates[i].split(',')]
-    vs.append(p5.Vector(xyz[0], xyz[1]))
-xs = [v.x for v in vs]
-ys = [v.y for v in vs]
+    # vs.append(p5.Vector(xyz[0], xyz[1])) ### p5 para numpy abaixo:
+    vs.append(np.array([xyz[0], xyz[1]]))
+xs = [v[0] for v in vs]
+ys = [v[1] for v in vs]
 xsSort = xs.copy()
 xsSort.sort()
 no = xs.index(xsSort[0]) if ys[xs.index(xsSort[0])] > ys[xs.index(xsSort[1])] else xs.index(xsSort[1])
@@ -33,10 +40,12 @@ se = xs.index(xsSort[2]) if ys[xs.index(xsSort[2])] < ys[xs.index(xsSort[3])] el
 # print(vs[no], vs[so], vs[ne], vs[se])
 
 hor = vs[no]-vs[ne]
-hor = hor.magnitude * 111100 * math.cos(math.radians(vs[no].y))
+# hor = hor.magnitude * 111100 * math.cos(math.radians(vs[no].y)) ### p5 para numpy abaixo:
+hor = np.linalg.norm(hor) * 111100 * math.cos(math.radians(vs[no][1]))
 # print(hor)
 ver = vs[no]-vs[so]
-ver = ver.magnitude * 111100
+# ver = ver.magnitude * 111100 ### p5 para numpy abaixo:
+ver = np.linalg.norm(ver) * 111100
 # print(ver)
 
 if hor > ver:
@@ -48,13 +57,16 @@ else:
 
 ori_des_1 = ori1-vs[so]
 ori_des_2 = vs[ne]-des2
-nSeg = math.ceil(max(ori_des_1.magnitude, ori_des_2.magnitude) / (lateral70/111100))
+# nSeg = math.ceil(max(ori_des_1.magnitude, ori_des_2.magnitude) / (lateral70/111100)) ### p5 para numpy abaixo:
+nSeg = math.ceil(max(np.linalg.norm(ori_des_1), np.linalg.norm(ori_des_2)) / (lateral70/111100)) 
 segO = ori_des_1
 # print("Lateral1: ", ori_des_1.magnitude / nSeg * 111100)
 # print("Lateral2: ", ori_des_2.magnitude / nSeg * 111100)
-segO.limit(ori_des_1.magnitude / nSeg)
+# segO.limit(ori_des_1.magnitude / nSeg) ### p5 para numpy abaixo:
+segO = limit(segO, np.linalg.norm(ori_des_1) / nSeg)
 segD = ori_des_2
-segD.limit(ori_des_2.magnitude / nSeg)
+# segD.limit(ori_des_2.magnitude / nSeg) ### p5 para numpy abaixo:
+segD = limit(segD, np.linalg.norm(ori_des_2) / nSeg)
 
 o = []
 o.append(ori1)
@@ -73,11 +85,14 @@ distancia = 0
 for i in range(0, nSeg+1, 2):
     wp.append(o[i])
     wp.append(d[i])
-    distancia += ((o[i]-d[i]).magnitude * 111100)
+    # distancia += ((o[i]-d[i]).magnitude * 111100) ### p5 para numpy abaixo:
+    distancia += (np.linalg.norm(o[i]-d[i]) * 111100)
     if i+1 < len(d):
-        distancia += ((d[i]-d[i+1]).magnitude * 111100)
+        # distancia += ((d[i]-d[i+1]).magnitude * 111100) ### p5 para numpy abaixo:
+        distancia += (np.linalg.norm(d[i]-d[i+1]) * 111100)
         wp.append(d[i+1])
-        distancia += ((d[i+1]-o[i+1]).magnitude * 111100)
+        # distancia += ((d[i+1]-o[i+1]).magnitude * 111100) ### p5 para numpy abaixo:
+        distancia += (np.linalg.norm(d[i+1]-o[i+1]) * 111100)
         wp.append(o[i+1])
 distancia = math.ceil(distancia)
 print("Distancia: {} metros".format(distancia))
@@ -93,11 +108,13 @@ wp3 = []
 wp3.append(wp[0])
 for i in range(1, len(wp)-1):
     dir = wp[i-1]-wp[i]
-    dir.limit(0.0001)
+    # dir.limit(0.0001) ### p5 para numpy abaixo:
+    dir = limit(dir, 0.0001)
     wp3.append(wp[i]+dir)
     wp3.append(wp[i])
     dir = wp[i]-wp[i+1]
-    dir.limit(0.0001)
+    # dir.limit(0.0001) ### p5 para numpy abaixo:
+    dir = limit(dir, 0.0001)
     wp3.append(wp[i]-dir)
 wp3.append(wp[-1])
 
@@ -111,7 +128,7 @@ with open('waylines.wpml', 'w') as file:
     print(data, file=file)
 
 with open('first.xml', 'r') as file:
-    data = file.read().replace('###coordenada###', '{},{}'.format(wp3[0].x, wp3[0].y))
+    data = file.read().replace('###coordenada###', '{},{}'.format(wp3[0][0], wp3[0][1]))
     data = data.replace('###altitude###', '{}'.format(altitude))
     data = data.replace('###velocidade###', '{}'.format(velo_1f_5s))
 with open('waylines.wpml', 'a') as file:
@@ -119,7 +136,7 @@ with open('waylines.wpml', 'a') as file:
 
 for i in range(1, len(wp3)-1):
     with open('placemark.xml', 'r') as file:
-        data = file.read().replace('###coordenada###', '{},{}'.format(wp3[i].x, wp3[i].y))
+        data = file.read().replace('###coordenada###', '{},{}'.format(wp3[i][0], wp3[i][1]))
         data = data.replace('###altitude###', '{}'.format(altitude))
         data = data.replace('###velocidade###', '{}'.format(velo_1f_5s))
         data = data.replace('###index###', '{}'.format(i))
@@ -128,7 +145,7 @@ for i in range(1, len(wp3)-1):
         print(data, file=file)
 
 with open('last.xml', 'r') as file:
-    data = file.read().replace('###coordenada###', '{},{}'.format(wp3[-1].x, wp3[-1].y))
+    data = file.read().replace('###coordenada###', '{},{}'.format(wp3[-1][0], wp3[-1][1]))
     data = data.replace('###altitude###', '{}'.format(altitude))
     data = data.replace('###velocidade###', '{}'.format(velo_1f_5s))
     data = data.replace('###index###', '{}'.format(len(wp3)-1))
